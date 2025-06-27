@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silicon Interposer vs Fan-Out Packaging Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .comparison-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .packaging-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .packaging-section:hover {
+            transform: translateY(-5px);
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .visualization-container {
+            height: 350px;
+            position: relative;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            border: 2px solid #dee2e6;
+        }
+
+        .cross-section {
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Thermal Overlay */
+        .thermal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        .thermal-overlay.active {
+            opacity: 0.7;
+        }
+
+        .thermal-gradient-interposer {
+            background: radial-gradient(ellipse at 50% 65%, 
+                rgba(255, 0, 0, 0.8) 0%,
+                rgba(255, 100, 0, 0.6) 30%,
+                rgba(255, 255, 0, 0.4) 60%,
+                rgba(0, 255, 0, 0.2) 100%);
+        }
+
+        .thermal-gradient-fanout {
+            background: radial-gradient(ellipse at 50% 65%, 
+                rgba(255, 0, 0, 0.9) 0%,
+                rgba(255, 50, 0, 0.8) 20%,
+                rgba(255, 100, 0, 0.7) 40%,
+                rgba(255, 200, 0, 0.5) 70%,
+                rgba(255, 255, 0, 0.3) 100%);
+        }
+
+        /* Electrical Signal Overlay */
+        .electrical-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        .electrical-overlay.active {
+            opacity: 1;
+        }
+
+        .signal-path {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, #00ffff, #0080ff);
+            border-radius: 1px;
+            animation: signal-flow 2s infinite;
+        }
+
+        @keyframes signal-flow {
+            0% { 
+                box-shadow: 0 0 5px #00ffff;
+                transform: scaleX(0);
+            }
+            50% {
+                box-shadow: 0 0 10px #00ffff;
+                transform: scaleX(1);
+            }
+            100% {
+                box-shadow: 0 0 5px #00ffff;
+                transform: scaleX(0);
+            }
+        }
+
+        /* Heat Flow Animation */
+        .heat-particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: radial-gradient(circle, #ff4444, #ff0000);
+            border-radius: 50%;
+            opacity: 0;
+            animation: heat-rise 3s infinite;
+        }
+
+        @keyframes heat-rise {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-100px) scale(0.5);
+            }
+        }
+
+        /* Silicon Interposer Visualization */
+        .interposer-stack {
+            position: relative;
+            width: 280px;
+            height: 250px;
+        }
+
+        .pcb-layer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 40px;
+            background: linear-gradient(to bottom, #228B22, #006400);
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .package-substrate {
+            position: absolute;
+            bottom: 40px;
+            left: 15%;
+            width: 70%;
+            height: 30px;
+            background: linear-gradient(to bottom, #8B4513, #A0522D);
+            border-radius: 3px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .silicon-interposer {
+            position: absolute;
+            bottom: 70px;
+            left: 20%;
+            width: 60%;
+            height: 15px;
+            background: linear-gradient(to bottom, #C0C0C0, #808080);
+            border-radius: 2px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .die {
+            position: absolute;
+            width: 40px;
+            height: 25px;
+            background: linear-gradient(to bottom, #4169E1, #191970);
+            border-radius: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .die:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+
+        .cpu-die {
+            bottom: 85px;
+            left: 25%;
+        }
+
+        .gpu-die {
+            bottom: 85px;
+            left: 45%;
+        }
+
+        .hbm-die {
+            bottom: 85px;
+            left: 65%;
+        }
+
+        /* TSV Visualization */
+        .tsv {
+            position: absolute;
+            width: 2px;
+            height: 30px;
+            background: linear-gradient(to bottom, #FFD700, #FFA500);
+            bottom: 55px;
+        }
+
+        .tsv-1 { left: 30%; }
+        .tsv-2 { left: 35%; }
+        .tsv-3 { left: 50%; }
+        .tsv-4 { left: 55%; }
+        .tsv-5 { left: 70%; }
+        .tsv-6 { left: 75%; }
+
+        /* Fan-Out Visualization */
+        .fanout-stack {
+            position: relative;
+            width: 280px;
+            height: 250px;
+        }
+
+        .pcb-layer-fo {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 40px;
+            background: linear-gradient(to bottom, #228B22, #006400);
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .mold-compound {
+            position: absolute;
+            bottom: 40px;
+            left: 10%;
+            width: 80%;
+            height: 60px;
+            background: linear-gradient(to bottom, #2F4F4F, #708090);
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .embedded-die {
+            position: absolute;
+            width: 35px;
+            height: 20px;
+            background: linear-gradient(to bottom, #4169E1, #191970);
+            border-radius: 2px;
+            bottom: 60px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .embedded-die:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+
+        .embedded-cpu { left: 20%; }
+        .embedded-gpu { left: 40%; }
+        .embedded-mem { left: 60%; }
+
+        .rdl-layer {
+            position: absolute;
+            bottom: 100px;
+            left: 5%;
+            width: 90%;
+            height: 8px;
+            background: linear-gradient(to right, #FFD700, #FFA500);
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* Solder Balls */
+        .solder-ball {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: radial-gradient(circle, #C0C0C0, #808080);
+            border-radius: 50%;
+            bottom: 34px;
+        }
+
+        .ball-1 { left: 15%; }
+        .ball-2 { left: 25%; }
+        .ball-3 { left: 35%; }
+        .ball-4 { left: 45%; }
+        .ball-5 { left: 55%; }
+        .ball-6 { left: 65%; }
+        .ball-7 { left: 75%; }
+        .ball-8 { left: 85%; }
+
+        /* Temperature Indicators */
+        .temp-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .temp-indicator.active {
+            opacity: 1;
+        }
+
+        .temp-hot { color: #ff4444; }
+        .temp-warm { color: #ffaa00; }
+        .temp-cool { color: #44ff44; }
+
+        /* Electrical Metrics */
+        .electrical-metrics {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .electrical-metrics.active {
+            opacity: 1;
+        }
+
+        /* Info Panel */
+        .info-panel {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .performance-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .performance-card:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-3px);
+        }
+
+        .performance-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #FFD700;
+            text-align: center;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            font-weight: bold;
+        }
+
+        .controls {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .control-btn {
+            background: linear-gradient(45deg, #FF6B6B, #FF8E53);
+            border: none;
+            padding: 12px 24px;
+            margin: 0 10px;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+
+        .control-btn.active {
+            background: linear-gradient(45deg, #4ECDC4, #44A08D);
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+
+        .highlight {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Thermal Legend */
+        .thermal-legend {
+            display: none;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+
+        .thermal-legend.active {
+            display: flex;
+        }
+
+        .thermal-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .thermal-color {
+            width: 20px;
+            height: 16px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .comparison-container {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .visualization-container {
+                height: 300px;
+            }
+            
+            .interposer-stack, .fanout-stack {
+                width: 240px;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Silicon Interposer vs Fan-Out Packaging Technologies</h1>
+        
+        <div class="controls">
+            <button class="control-btn active" onclick="showStructural()">Structural View</button>
+            <button class="control-btn" onclick="showThermal()">Thermal Analysis</button>
+            <button class="control-btn" onclick="showElectrical()">Electrical Performance</button>
+            <button class="control-btn" onclick="showComparison()">Performance Metrics</button>
+        </div>
+
+        <div class="comparison-container" id="comparisonContainer">
+            <div class="packaging-section">
+                <h2 class="section-title">Silicon Interposer (2.5D Packaging)</h2>
+                <div class="visualization-container">
+                    <div class="cross-section">
+                        <div class="interposer-stack">
+                            <!-- Thermal Overlay -->
+                            <div class="thermal-overlay thermal-gradient-interposer" id="thermalInterposer"></div>
+                            
+                            <!-- Electrical Overlay -->
+                            <div class="electrical-overlay" id="electricalInterposer">
+                                <!-- Signal paths for TSVs -->
+                                <div class="signal-path" style="left: 30%; top: 55%; width: 2px; height: 30px; animation-delay: 0s;"></div>
+                                <div class="signal-path" style="left: 35%; top: 55%; width: 2px; height: 30px; animation-delay: 0.2s;"></div>
+                                <div class="signal-path" style="left: 50%; top: 55%; width: 2px; height: 30px; animation-delay: 0.4s;"></div>
+                                <div class="signal-path" style="left: 55%; top: 55%; width: 2px; height: 30px; animation-delay: 0.6s;"></div>
+                                <!-- Horizontal interconnects -->
+                                <div class="signal-path" style="left: 20%; top: 68%; width: 60%; height: 2px; animation-delay: 0.8s;"></div>
+                            </div>
+
+                            <!-- Temperature Indicator -->
+                            <div class="temp-indicator temp-warm" id="tempInterposer">
+                                Max: 85°C<br>Junction: 75°C
+                            </div>
+
+                            <!-- Electrical Metrics -->
+                            <div class="electrical-metrics" id="elecInterposer">
+                                Resistance: 0.5Ω<br>
+                                Delay: 15ps<br>
+                                Bandwidth: 2TB/s
+                            </div>
+
+                            <!-- Heat Particles -->
+                            <div class="heat-particle" style="left: 30%; bottom: 110px; animation-delay: 0s;"></div>
+                            <div class="heat-particle" style="left: 50%; bottom: 110px; animation-delay: 1s;"></div>
+                            <div class="heat-particle" style="left: 70%; bottom: 110px; animation-delay: 2s;"></div>
+
+                            <!-- PCB Layer -->
+                            <div class="pcb-layer"></div>
+                            <!-- Package Substrate -->
+                            <div class="package-substrate"></div>
+                            <!-- Silicon Interposer -->
+                            <div class="silicon-interposer"></div>
+                            <!-- TSVs -->
+                            <div class="tsv tsv-1"></div>
+                            <div class="tsv tsv-2"></div>
+                            <div class="tsv tsv-3"></div>
+                            <div class="tsv tsv-4"></div>
+                            <div class="tsv tsv-5"></div>
+                            <div class="tsv tsv-6"></div>
+                            <!-- Dies -->
+                            <div class="die cpu-die" data-info="CPU: 150W TDP, Direct thermal path through silicon"></div>
+                            <div class="die gpu-die" data-info="GPU: 250W TDP, High-bandwidth memory interface"></div>
+                            <div class="die hbm-die" data-info="HBM: 15W TDP, Ultra-high bandwidth connection"></div>
+                            <!-- Solder Balls -->
+                            <div class="solder-ball ball-1"></div>
+                            <div class="solder-ball ball-2"></div>
+                            <div class="solder-ball ball-3"></div>
+                            <div class="solder-ball ball-4"></div>
+                            <div class="solder-ball ball-5"></div>
+                            <div class="solder-ball ball-6"></div>
+                            <div class="solder-ball ball-7"></div>
+                            <div class="solder-ball ball-8"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-panel" id="interposerInfo">
+                    <strong>Thermal & Electrical Advantages:</strong><br>
+                    • Silicon thermal conductivity: ~150 W/m·K<br>
+                    • Direct heat dissipation path through silicon<br>
+                    • Ultra-short interconnects (μm-scale)<br>
+                    • Minimal electrical resistance and parasitic capacitance<br>
+                    • High-speed signal integrity for extreme bandwidth applications
+                </div>
+            </div>
+
+            <div class="packaging-section">
+                <h2 class="section-title">Fan-Out Wafer-Level Packaging (FOWLP)</h2>
+                <div class="visualization-container">
+                    <div class="cross-section">
+                        <div class="fanout-stack">
+                            <!-- Thermal Overlay -->
+                            <div class="thermal-overlay thermal-gradient-fanout" id="thermalFanout"></div>
+                            
+                            <!-- Electrical Overlay -->
+                            <div class="electrical-overlay" id="electricalFanout">
+                                <!-- RDL signal paths -->
+                                <div class="signal-path" style="left: 5%; top: 60%; width: 90%; height: 2px; animation-delay: 0s;"></div>
+                                <div class="signal-path" style="left: 20%; top: 58%; width: 15%; height: 2px; animation-delay: 0.3s;"></div>
+                                <div class="signal-path" style="left: 40%; top: 58%; width: 15%; height: 2px; animation-delay: 0.6s;"></div>
+                                <div class="signal-path" style="left: 60%; top: 58%; width: 15%; height: 2px; animation-delay: 0.9s;"></div>
+                            </div>
+
+                            <!-- Temperature Indicator -->
+                            <div class="temp-indicator temp-hot" id="tempFanout">
+                                Max: 105°C<br>Junction: 95°C
+                            </div>
+
+                            <!-- Electrical Metrics -->
+                            <div class="electrical-metrics" id="elecFanout">
+                                Resistance: 2.1Ω<br>
+                                Delay: 45ps<br>
+                                Bandwidth: 400GB/s
+                            </div>
+
+                            <!-- Heat Particles (more concentrated) -->
+                            <div class="heat-particle" style="left: 20%; bottom: 100px; animation-delay: 0s;"></div>
+                            <div class="heat-particle" style="left: 25%; bottom: 100px; animation-delay: 0.5s;"></div>
+                            <div class="heat-particle" style="left: 40%; bottom: 100px; animation-delay: 1s;"></div>
+                            <div class="heat-particle" style="left: 45%; bottom: 100px; animation-delay: 1.5s;"></div>
+                            <div class="heat-particle" style="left: 60%; bottom: 100px; animation-delay: 2s;"></div>
+                            <div class="heat-particle" style="left: 65%; bottom: 100px; animation-delay: 2.5s;"></div>
+
+                            <!-- PCB Layer -->
+                            <div class="pcb-layer-fo"></div>
+                            <!-- Mold Compound -->
+                            <div class="mold-compound"></div>
+                            <!-- RDL Layer -->
+                            <div class="rdl-layer"></div>
+                            <!-- Embedded Dies -->
+                            <div class="embedded-die embedded-cpu" data-info="CPU: 120W TDP, Heat trapped in mold compound"></div>
+                            <div class="embedded-die embedded-gpu" data-info="GPU: 180W TDP, Limited thermal dissipation"></div>
+                            <div class="embedded-die embedded-mem" data-info="Memory: 12W TDP, RDL-based connections"></div>
+                            <!-- Solder Balls -->
+                            <div class="solder-ball ball-1"></div>
+                            <div class="solder-ball ball-2"></div>
+                            <div class="solder-ball ball-3"></div>
+                            <div class="solder-ball ball-4"></div>
+                            <div class="solder-ball ball-5"></div>
+                            <div class="solder-ball ball-6"></div>
+                            <div class="solder-ball ball-7"></div>
+                            <div class="solder-ball ball-8"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-panel" id="fanoutInfo">
+                    <strong>Thermal & Electrical Characteristics:</strong><br>
+                    • Mold compound thermal conductivity: ~0.5-2 W/m·K<br>
+                    • Heat trapped within mold compound<br>
+                    • Longer RDL interconnect paths (mm-scale)<br>
+                    • Higher electrical resistance and parasitic effects<br>
+                    • Good performance for moderate bandwidth applications
+                </div>
+            </div>
+        </div>
+
+        <div class="legend" id="structuralLegend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(to bottom, #4169E1, #191970);"></div>
+                <span>Active Dies (CPU/GPU/Memory)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(to bottom, #C0C0C0, #808080);"></div>
+                <span>Silicon Interposer</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(to bottom, #2F4F4F, #708090);"></div>
+                <span>Mold Compound</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(to right, #FFD700, #FFA500);"></div>
+                <span>TSVs / RDLs</span>
+            </div>
+        </div>
+
+        <div class="thermal-legend" id="thermalLegend">
+            <div class="thermal-item">
+                <div class="thermal-color" style="background: linear-gradient(to right, #ff0000, #ff4444);"></div>
+                <span>Hottest (>100°C)</span>
+            </div>
+            <div class="thermal-item">
+                <div class="thermal-color" style="background: linear-gradient(to right, #ff6600, #ff9900);"></div>
+                <span>Hot (80-100°C)</span>
+            </div>
+            <div class="thermal-item">
+                <div class="thermal-color" style="background: linear-gradient(to right, #ffff00, #ffff66);"></div>
+                <span>Warm (60-80°C)</span>
+            </div>
+            <div class="thermal-item">
+                <div class="thermal-color" style="background: linear-gradient(to right, #00ff00, #66ff66);"></div>
+                <span>Cool (<60°C)</span>
+            </div>
+        </div>
+
+        <div class="performance-grid" id="performanceGrid">
+            <div class="performance-card">
+                <div class="performance-title">Thermal Performance</div>
+                <div class="metric-row">
+                    <span>Silicon Thermal Conductivity:</span>
+                    <span class="metric-value">150 W/m·K</span>
+                </div>
+                <div class="metric-row">
+                    <span>Mold Compound Conductivity:</span>
+                    <span class="metric-value">0.5-2 W/m·K</span>
+                </div>
+                <div class="metric-row">
+                    <span>Heat Dissipation Efficiency:</span>
+                    <span class="metric-value">Si: 75x Better</span>
+                </div>
+                <div class="metric-row">
+                    <span>Max Junction Temperature:</span>
+                    <span class="metric-value">Si: 75°C | FO: 95°C</span>
+                </div>
+            </div>
+
+            <div class="performance-card">
+                <div class="performance-title">Electrical Performance</div>
+                <div class="metric-row">
+                    <span>Interconnect Length:</span>
+                    <span class="metric-value">Si: μm | FO: mm</span>
+                </div>
+                <div class="metric-row">
+                    <span>Electrical Resistance:</span>
+                    <span class="metric-value">Si: 0.5Ω | FO: 2.1Ω</span>
+                </div>
+                <div class="metric-row">
+                    <span>Signal Delay:</span>
+                    <span class="metric-value">Si: 15ps | FO: 45ps</span>
+                </div>
+                <div class="metric-row">
+                    <span>Max Bandwidth:</span>
+                    <span class="metric-value">Si: 2TB/s | FO: 400GB/s</span>
+                </div>
+            </div>
+
+            <div class="performance-card">
+                <div class="performance-title">Cost & Manufacturing</div>
+                <div class="metric-row">
+                    <span>Manufacturing Cost:</span>
+                    <span class="metric-value">Si: High | FO: Low</span>
+                </div>
+                <div class="metric-row">
+                    <span>Package Thickness:</span>
+                    <span class="metric-value">Si: 2-3mm | FO: 0.5-1mm</span>
+                </div>
+                <div class="metric-row">
+                    <span>Yield Rate:</span>
+                    <span class="metric-value">Si: 85% | FO: 92%</span>
+                </div>
+                <div class="metric-row">
+                    <span>Volume Scalability:</span>
+                    <span class="metric-value">Si: Limited | FO: High</span>
+                </div>
+            </div>
+
+            <div class="performance-card">
+                <div class="performance-title">Application Suitability</div>
+                <div class="metric-row">
+                    <span>High-Performance Computing:</span>
+                    <span class="metric-value">Si: Excellent</span>
+                </div>
+                <div class="metric-row">
+                    <span>Mobile Devices:</span>
+                    <span class="metric-value">FO: Excellent</span>
+                </div>
+                <div class="metric-row">
+                    <span>AI/ML Accelerators:</span>
+                    <span class="metric-value">Si: Preferred</span>
+                </div>
+                <div class="metric-row">
+                    <span>Consumer Electronics:</span>
+                    <span class="metric-value">FO: Preferred</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentView = 'structural';
+
+        // Add interactive tooltips
+        document.querySelectorAll('[data-info]').forEach(element => {
+            element.addEventListener('mouseenter', function(e) {
+                showTooltip(e.pageX, e.pageY, this.dataset.info);
+            });
+            
+            element.addEventListener('mouseleave', function() {
+                hideTooltip();
+            });
+        });
+
+        function showTooltip(x, y, text) {
+            let tooltip = document.getElementById('tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.id = 'tooltip';
+                tooltip.style.cssText = `
+                    position: absolute;
+                    background: rgba(0,0,0,0.9);
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    font-size: 0.9rem;
+                    pointer-events: none;
+                    z-index: 1000;
+                    max-width: 250px;
+                    line-height: 1.3;
+                `;
+                document.body.appendChild(tooltip);
+            }
+            tooltip.textContent = text;
+            tooltip.style.left = (x + 10) + 'px';
+            tooltip.style.top = (y - 10) + 'px';
+            tooltip.style.display = 'block';
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById('tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        function showStructural() {
+            currentView = 'structural';
+            hideAllOverlays();
+            document.getElementById('structuralLegend').style.display = 'flex';
+            document.getElementById('thermalLegend').classList.remove('active');
+            document.getElementById('performanceGrid').style.display = 'grid';
+            updateActiveButton(0);
+            updateInfoPanels('structural');
+        }
+
+        function showThermal() {
+            currentView = 'thermal';
+            hideAllOverlays();
+            document.getElementById('thermalInterposer').classList.add('active');
+            document.getElementById('thermalFanout').classList.add('active');
+            document.getElementById('tempInterposer').classList.add('active');
+            document.getElementById('tempFanout').classList.add('active');
+            document.getElementById('structuralLegend').style.display = 'none';
+            document.getElementById('thermalLegend').classList.add('active');
+            document.getElementById('performanceGrid').style.display = 'grid';
+            updateActiveButton(1);
+            updateInfoPanels('thermal');
+        }
+
+        function showElectrical() {
+            currentView = 'electrical';
+            hideAllOverlays();
+            document.getElementById('electricalInterposer').classList.add('active');
+            document.getElementById('electricalFanout').classList.add('active');
+            document.getElementById('elecInterposer').classList.add('active');
+            document.getElementById('elecFanout').classList.add('active');
+            document.getElementById('structuralLegend').style.display = 'flex';
+            document.getElementById('thermalLegend').classList.remove('active');
+            document.getElementById('performanceGrid').style.display = 'grid';
+            updateActiveButton(2);
+            updateInfoPanels('electrical');
+        }
+
+        function showComparison() {
+            currentView = 'comparison';
+            hideAllOverlays();
+            document.getElementById('structuralLegend').style.display = 'flex';
+            document.getElementById('thermalLegend').classList.remove('active');
+            document.getElementById('performanceGrid').style.display = 'grid';
+            updateActiveButton(3);
+            updateInfoPanels('comparison');
+        }
+
+        function hideAllOverlays() {
+            document.querySelectorAll('.thermal-overlay, .electrical-overlay, .temp-indicator, .electrical-metrics').forEach(el => {
+                el.classList.remove('active');
+            });
+        }
+
+        function updateInfoPanels(view) {
+            const interposerInfo = document.getElementById('interposerInfo');
+            const fanoutInfo = document.getElementById('fanoutInfo');
+            
+            switch(view) {
+                case 'thermal':
+                    interposerInfo.innerHTML = `
+                        <strong>Thermal Advantages:</strong><br>
+                        • Silicon thermal conductivity: 150 W/m·K (75x better than mold compound)<br>
+                        • Direct heat dissipation path from dies through silicon<br>
+                        • Lower junction temperatures enable higher performance<br>
+                        • Better thermal management for power-hungry dies<br>
+                        • Reduced thermal throttling in high-performance applications
+                    `;
+                    fanoutInfo.innerHTML = `
+                        <strong>Thermal Limitations:</strong><br>
+                        • Mold compound thermal conductivity: 0.5-2 W/m·K<br>
+                        • Heat trapped within mold compound material<br>
+                        • Higher junction temperatures (20°C+ increase)<br>
+                        • Thermal bottleneck limits power dissipation<br>
+                        • May require thermal throttling under heavy loads
+                    `;
+                    break;
+                case 'electrical':
+                    interposerInfo.innerHTML = `
+                        <strong>Electrical Advantages:</strong><br>
+                        • Ultra-short TSV interconnects (10-50 μm)<br>
+                        • Minimal resistance: 0.5Ω typical<br>
+                        • Low signal delay: 15ps propagation<br>
+                        • Extreme bandwidth: 2TB/s achievable<br>
+                        • Superior signal integrity and noise immunity
+                    `;
+                    fanoutInfo.innerHTML = `
+                        <strong>Electrical Characteristics:</strong><br>
+                        • Longer RDL interconnects (1-5 mm)<br>
+                        • Higher resistance: 2.1Ω typical<br>
+                        • Increased signal delay: 45ps propagation<br>
+                        • Moderate bandwidth: 400GB/s typical<br>
+                        • Good performance for mainstream applications
+                    `;
+                    break;
+                default:
+                    interposerInfo.innerHTML = `
+                        <strong>Key Features:</strong><br>
+                        • Dies mounted ON TOP of silicon substrate<br>
+                        • Through-Silicon Vias (TSVs) provide vertical connections<br>
+                        • Highest interconnect density achievable<br>
+                        • Excellent for extreme bandwidth applications (HBM + GPU/CPU)<br>
+                        • Multiple substrate layers (silicon interposer + package substrate)
+                    `;
+                    fanoutInfo.innerHTML = `
+                        <strong>Key Features:</strong><br>
+                        • Dies EMBEDDED WITHIN mold compound<br>
+                        • Redistribution Layers (RDLs) fan out connections<br>
+                        • Thinner, more compact package<br>
+                        • No separate substrate needed for dies<br>
+                        • Cost-effective for high-volume production
+                    `;
+            }
+        }
+
+        function updateActiveButton(activeIndex) {
+            const buttons = document.querySelectorAll('.control-btn');
+            buttons.forEach((btn, index) => {
+                btn.classList.toggle('active', index === activeIndex);
+            });
+        }
+
+        // Add some animation on load
+        window.addEventListener('load', function() {
+            const dies = document.querySelectorAll('.die, .embedded-die');
+            dies.forEach((die, index) => {
+                die.style.transform = 'translateY(-20px)';
+                die.style.opacity = '0';
+                setTimeout(() => {
+                    die.style.transition = 'all 0.6s ease';
+                    die.style.transform = 'translateY(0)';
+                    die.style.opacity = '1';
+                }, index * 200);
+            });
+        });
+
+        // Initialize with structural view
+        showStructural();
+    </script>
+</body>
+</html>
